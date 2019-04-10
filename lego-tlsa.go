@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/xenolf/lego/acme"
+	"github.com/go-acme/lego/challenge/dns01"
 )
 
 var (
@@ -45,11 +45,14 @@ func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 	if err != nil {
 		return err
 	}
+	if *verbose {
+		fmt.Printf("dnsnames %v\n", cert.DNSNames)
+	}
 
 	// Build a list of zones from the domains
 	for _, name := range cert.DNSNames {
 		fqdn := dns.Fqdn(name)
-		zone, err := acme.FindZoneByFqdn(fqdn, []string{nameserver})
+		zone, err := dns01.FindZoneByFqdnCustom(fqdn, []string{nameserver})
 		if err != nil {
 			return fmt.Errorf("ERROR: unable to determine zone for %q: %v", name, err)
 		}
@@ -90,9 +93,6 @@ func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 		}
 	}
 
-	if *verbose {
-		fmt.Printf("dnsnames %v\n", cert.DNSNames)
-	}
 	return nil
 }
 
@@ -135,7 +135,11 @@ func main() {
 		}
 	}
 	if *verbose {
-		fmt.Printf("rrMap %v\n", rrMap)
+		for k, v := range rrMap {
+			for _, vv := range v {
+				fmt.Printf("rrMap[%v]: %+v\n", k, vv)
+			}
+		}
 	}
 	//os.Exit(0)
 
