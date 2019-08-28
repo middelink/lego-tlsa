@@ -9,20 +9,88 @@ import (
 	"net"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/miekg/dns"
 	"github.com/go-acme/lego/challenge/dns01"
+	"github.com/miekg/dns"
 )
+
+type mapping map[string]struct {
+	tcpports, udpports []int
+}
 
 var (
 	pathStr    string
 	nameserver string
-	fqdn2zone  = map[string]string{}
-	ttl        = flag.Uint("ttl", 86400, "TTL of the TLSA RR's")
-	verbose    = flag.Bool("verbose", false, "Verbose logging")
+	mappings   = mapping{
+		"influx":     {tcpports: []int{8888}},
+		"ha":         {tcpports: []int{8123}},
+		"webcam":     {tcpports: []int{8080}},
+		"router":     {tcpports: []int{809}},
+
+		"openvpn":    {tcpports: []int{943}, udpports: []int{1194}},
+		"mx":         {tcpports: []int{25}},
+		"mx1":        {tcpports: []int{25}},
+		"mx2":        {tcpports: []int{25}},
+		"mx3":        {tcpports: []int{25}},
+		"mx4":        {tcpports: []int{25}},
+		"smtp":       {tcpports: []int{25, 465, 587}},
+		"submission": {tcpports: []int{587}},
+		"smtps":      {tcpports: []int{465}},
+		"pop3":       {tcpports: []int{110, 995}},
+		"pop3s":      {tcpports: []int{995}},
+		"imap":       {tcpports: []int{143, 993}},
+		"imaps":      {tcpports: []int{993}},
+		"news":       {tcpports: []int{119, 563}},
+		"nntp":       {tcpports: []int{119, 563}},
+		"nntps":      {tcpports: []int{563}},
+		"ldap":       {tcpports: []int{389, 636}},
+		"ldaps":      {tcpports: []int{636}},
+		"ftp":        {tcpports: []int{21, 990}},
+		"ftps":       {tcpports: []int{990}},
+	}
+	fqdn2zone = map[string]string{}
+	ttl       = flag.Uint("ttl", 86400, "TTL of the TLSA RR's")
+	verbose   = flag.Bool("verbose", false, "Verbose logging")
+	dryrun    = flag.Bool("dry_run", false, "Dry run, do not actually send dns updates")
 )
+
+func (m *mapping) String() string {
+	return ""
+}
+
+// Decode a string like <prefix>:<port>{t|u}[,<port>{t|u}]*[;<prefix>:<port>{t|u}[,<port>{t|u}]*]*
+func (m *mapping) Set(s string) error {
+	if m == nil {
+		*m = make(mapping)
+	}
+	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ';' }) {
+		names := strings.SplitN(part, ":", 2)
+		if len(names) != 2 {
+			return fmt.Errorf("missing name")
+		}
+		ports := struct{ tcpports, udpports []int }{}
+		for _, port := range strings.FieldsFunc(names[1], func(r rune) bool { return r == ',' }) {
+			porttype := port[len(port)-1:]
+			if val, err := strconv.Atoi(port[:len(port)-1]); err != nil {
+				return fmt.Errorf("invalid port number")
+			} else {
+				switch porttype {
+				case "t":
+					ports.tcpports = append(ports.tcpports, val)
+				case "u":
+					ports.udpports = append(ports.udpports, val)
+				default:
+					return fmt.Errorf("missing 't' or 'u' suffix")
+				}
+			}
+		}
+		(*m)[names[0]] = ports
+	}
+	return nil
+}
 
 func unFqdn(fqdn string) string {
 	n := len(fqdn)
@@ -60,24 +128,9 @@ func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 		// Do some very adhoc mapping from certname to ports and register tlsa entries for them
 		tcp_ports := []int{443}
 		udp_ports := []int{}
-		switch dns.SplitDomainName(name)[0] {
-		case "smtp", "submission", "smtps":
-			tcp_ports = []int{25, 587, 465}
-		case "pop3", "pop3s":
-			tcp_ports = []int{110, 995}
-		case "imap", "imaps":
-			tcp_ports = []int{143, 993}
-		case "news", "nntp", "nntps":
-			tcp_ports = []int{119, 563}
-		case "ldap", "ldaps":
-			tcp_ports = []int{389, 636}
-		case "ftp", "ftps":
-			tcp_ports = []int{21, 990}
-		case "router":
-			tcp_ports = []int{809}
-		case "openvpn":
-			tcp_ports = []int{943}
-			udp_ports = []int{1194}
+		if ports, ok := mappings[dns.SplitDomainName(name)[0]]; ok {
+			tcp_ports = ports.tcpports
+			udp_ports = ports.udpports
 		}
 		for _, port := range tcp_ports {
 			tlsa := fmt.Sprintf("_%d._tcp.%s", port, fqdn)
@@ -104,6 +157,7 @@ func main() {
 	}
 	defaultPath := path.Join(cwd, ".lego")
 	flag.StringVar(&pathStr, "path", defaultPath, "Path to get the certificates from")
+	flag.Var(&mappings, "mappings", "Add special prefix to port numbers mapping according to <prefix>:<port>{t|u}[,<port>{t|u}]*[;<prefix>:<port>{t|u}[,<port>{t|u}]*]*. E.g. influx:8888t")
 	flag.Parse()
 
 	nameserver = os.Getenv("RFC2136_NAMESERVER")
@@ -141,11 +195,9 @@ func main() {
 			}
 		}
 	}
-	//os.Exit(0)
 
 	// Setup a dns client
-	c := new(dns.Client)
-	c.SingleInflight = true
+	c := dns.Client{SingleInflight: true}
 	// TSIG authentication / msg signing
 	if len(tsigKey) > 0 && len(tsigSecret) > 0 {
 		c.TsigSecret = map[string]string{dns.Fqdn(tsigKey): tsigSecret}
@@ -161,15 +213,17 @@ func main() {
 		}
 
 		// Send the query
-		if *verbose {
+		if *verbose || *dryrun {
 			fmt.Printf("msg=%v\n", m)
 		}
-		reply, _, err := c.Exchange(m, nameserver)
-		if err != nil {
-			fmt.Printf("DNS update failed: %v\n", err)
-		}
-		if reply != nil && reply.Rcode != dns.RcodeSuccess {
-			fmt.Printf("DNS update failed. Server replied: %s\n", dns.RcodeToString[reply.Rcode])
+		if !*dryrun {
+			reply, _, err := c.Exchange(m, nameserver)
+			if err != nil {
+				fmt.Printf("DNS update failed: %v\n", err)
+			}
+			if reply != nil && reply.Rcode != dns.RcodeSuccess {
+				fmt.Printf("DNS update failed. Server replied: %s\n", dns.RcodeToString[reply.Rcode])
+			}
 		}
 	}
 }
