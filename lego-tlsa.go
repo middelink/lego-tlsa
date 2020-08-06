@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,8 @@ import (
 	"github.com/go-acme/lego/challenge/dns01"
 	"github.com/miekg/dns"
 )
+
+var version = "dev"
 
 type mapping map[string]struct {
 	tcpports, udpports []int
@@ -25,12 +28,13 @@ var (
 	pathStr    string
 	nameserver string
 	mappings   = mapping{
-		"influx":     {tcpports: []int{8888}},
-		"ha":         {tcpports: []int{8123}},
-		"webcam":     {tcpports: []int{8080}},
-		"router":     {tcpports: []int{809}},
+		"influx": {tcpports: []int{8888}},
+		"ha":     {tcpports: []int{8123}},
+		"webcam": {tcpports: []int{8080}},
+		"router": {tcpports: []int{809}},
+		"git":    {tcpports: []int{443}},
+		"pve":    {tcpports: []int{8006}},
 
-		"openvpn":    {tcpports: []int{943}, udpports: []int{1194}},
 		"mx":         {tcpports: []int{25}},
 		"mx1":        {tcpports: []int{25}},
 		"mx2":        {tcpports: []int{25}},
@@ -50,11 +54,13 @@ var (
 		"ldaps":      {tcpports: []int{636}},
 		"ftp":        {tcpports: []int{21, 990}},
 		"ftps":       {tcpports: []int{990}},
+		"openvpn":    {tcpports: []int{943}, udpports: []int{1194}},
 	}
-	fqdn2zone = map[string]string{}
-	ttl       = flag.Uint("ttl", 86400, "TTL of the TLSA RR's")
-	verbose   = flag.Bool("verbose", false, "Verbose logging")
-	dryrun    = flag.Bool("dry_run", false, "Dry run, do not actually send dns updates")
+	fqdn2zone  = map[string]string{}
+	ttl        = flag.Uint("ttl", 86400, "TTL of the TLSA RR's")
+	verbose    = flag.Bool("verbose", false, "Verbose logging")
+	dryrun     = flag.Bool("dry_run", false, "Dry run, do not actually send dns updates")
+	hasversion = flag.Bool("version", false, "Show verion information")
 )
 
 func (m *mapping) String() string {
@@ -159,6 +165,11 @@ func main() {
 	flag.StringVar(&pathStr, "path", defaultPath, "Path to get the certificates from")
 	flag.Var(&mappings, "mappings", "Add special prefix to port numbers mapping according to <prefix>:<port>{t|u}[,<port>{t|u}]*[;<prefix>:<port>{t|u}[,<port>{t|u}]*]*. E.g. influx:8888t")
 	flag.Parse()
+
+	if *hasversion {
+		fmt.Printf("lego-tlsa version %s %s/%s\n", version, runtime.GOOS, runtime.GOARCH)
+		return
+	}
 
 	nameserver = os.Getenv("RFC2136_NAMESERVER")
 	if nameserver == "" {
