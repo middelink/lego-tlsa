@@ -1,8 +1,5 @@
 .PHONY: clean build test
 
-export GO111MODULE=on
-export CGO_ENABLED=0
-
 MAIN_DIRECTORY := .
 BIN_OUTPUT := $(if $(filter $(shell go env GOOS), windows), lego-tlsa.exe, lego-tlsa)
 
@@ -13,12 +10,10 @@ VERSION := $(if $(TAG_NAME),$(TAG_NAME),$(SHA))
 default: clean test build
 
 clean:
-	@echo BIN_OUTPUT: ${BIN_OUTPUT}
-	rm -rf lego-tlsa cover.out
+	rm -rf ${BIN_OUTPUT} cover.out
 
 build: clean
-	@echo Version: $(VERSION)
-	go build -v -trimpath -ldflags '-X "main.version=${VERSION}"' -o ${BIN_OUTPUT} ${MAIN_DIRECTORY}
+	CGO_ENABLED=0 go build -v -trimpath -ldflags '-s -w -X "main.version=${VERSION}"' -o ${BIN_OUTPUT} ${MAIN_DIRECTORY}
 
 test: clean
 	go test -v -cover ./...
