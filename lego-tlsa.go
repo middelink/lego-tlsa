@@ -189,7 +189,7 @@ func main() {
 	tsigKey := os.Getenv("RFC2136_TSIG_KEY")
 	tsigSecret := os.Getenv("RFC2136_TSIG_SECRET")
 	if tsigAlgorithm == "" {
-		tsigAlgorithm = dns.HmacMD5
+		tsigAlgorithm = dns.HmacSHA256
 	}
 
 	rrMap := make(map[string][]dns.RR, len(flag.Args()))
@@ -220,7 +220,7 @@ func main() {
 		m.RemoveRRset(rrs)
 		m.Insert(rrs)
 		if len(tsigKey) > 0 && len(tsigSecret) > 0 {
-			m.SetTsig(dns.Fqdn(tsigKey), tsigAlgorithm, 300, time.Now().Unix())
+			m.SetTsig(dns.Fqdn(tsigKey), dns.Fqdn(tsigAlgorithm), 300, time.Now().Unix())
 		}
 
 		// Send the query
