@@ -56,7 +56,6 @@ var (
 		"ftps":       {tcpports: []int{990}},
 		"openvpn":    {tcpports: []int{943}, udpports: []int{1194}},
 	}
-	fqdn2zone  = map[string]string{}
 	ttl        = flag.Uint("ttl", 86400, "TTL of the TLSA RR's")
 	verbose    = flag.Bool("verbose", false, "Verbose logging")
 	dryrun     = flag.Bool("dry_run", false, "Dry run, do not actually send dns updates")
@@ -98,14 +97,6 @@ func (m *mapping) Set(s string) error {
 	return nil
 }
 
-func unFqdn(fqdn string) string {
-	n := len(fqdn)
-	if n > 0 && fqdn[n-1] == '.' {
-		return fqdn[:n-1]
-	}
-	return fqdn
-}
-
 func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 	certBytes, err := ioutil.ReadFile(path.Join(pathStr, "certificates", domain+".crt"))
 	if err != nil {
@@ -141,13 +132,13 @@ func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 		for _, port := range tcp_ports {
 			tlsa := fmt.Sprintf("_%d._tcp.%s", port, fqdn)
 			rr := &dns.TLSA{Hdr: dns.RR_Header{Name: tlsa, Class: dns.ClassINET, Ttl: uint32(*ttl)}}
-			rr.Sign(3, 0, 1, cert)
+			_ = rr.Sign(3, 0, 1, cert)
 			(*zone2RR)[zone] = append((*zone2RR)[zone], rr)
 		}
 		for _, port := range udp_ports {
 			tlsa := fmt.Sprintf("_%d._udp.%s", port, fqdn)
 			rr := &dns.TLSA{Hdr: dns.RR_Header{Name: tlsa, Class: dns.ClassINET, Ttl: uint32(*ttl)}}
-			rr.Sign(3, 0, 1, cert)
+			_ = rr.Sign(3, 0, 1, cert)
 			(*zone2RR)[zone] = append((*zone2RR)[zone], rr)
 		}
 	}
