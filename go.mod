@@ -1,6 +1,6 @@
 module github.com/middelink/lego-tlsa
 
-go 1.17
+go 1.21
 
 require (
 	github.com/go-acme/lego v2.7.2+incompatible

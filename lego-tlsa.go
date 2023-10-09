@@ -5,7 +5,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -98,7 +97,7 @@ func (m *mapping) Set(s string) error {
 }
 
 func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
-	certBytes, err := ioutil.ReadFile(path.Join(pathStr, "certificates", domain+".crt"))
+	certBytes, err := os.ReadFile(path.Join(pathStr, "certificates", domain+".crt"))
 	if err != nil {
 		return err
 	}
