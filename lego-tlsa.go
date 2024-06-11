@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-acme/lego/challenge/dns01"
+	"github.com/go-acme/lego/v4/challenge/dns01"
 	"github.com/miekg/dns"
 )
 
