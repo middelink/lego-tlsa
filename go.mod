@@ -3,7 +3,7 @@ module github.com/middelink/lego-tlsa
 go 1.23
 
 require (
-	github.com/go-acme/lego/v4 v4.21.0
+	github.com/go-acme/lego/v4 v4.22.2
 	github.com/miekg/dns v1.1.63
 )
 
