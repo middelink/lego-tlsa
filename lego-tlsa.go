@@ -78,17 +78,18 @@ func (m *mapping) Set(s string) error {
 		ports := struct{ tcpports, udpports []int }{}
 		for _, port := range strings.FieldsFunc(names[1], func(r rune) bool { return r == ',' }) {
 			porttype := port[len(port)-1:]
-			if val, err := strconv.Atoi(port[:len(port)-1]); err != nil {
+			var err error
+			var val int
+			if val, err = strconv.Atoi(port[:len(port)-1]); err != nil {
 				return fmt.Errorf("invalid port number")
-			} else {
-				switch porttype {
-				case "t":
-					ports.tcpports = append(ports.tcpports, val)
-				case "u":
-					ports.udpports = append(ports.udpports, val)
-				default:
-					return fmt.Errorf("missing 't' or 'u' suffix")
-				}
+			}
+			switch porttype {
+			case "t":
+				ports.tcpports = append(ports.tcpports, val)
+			case "u":
+				ports.udpports = append(ports.udpports, val)
+			default:
+				return fmt.Errorf("missing 't' or 'u' suffix")
 			}
 		}
 		(*m)[names[0]] = ports
@@ -96,7 +97,7 @@ func (m *mapping) Set(s string) error {
 	return nil
 }
 
-func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
+func parseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 	certBytes, err := os.ReadFile(path.Join(pathStr, "certificates", domain+".crt"))
 	if err != nil {
 		return err
@@ -122,19 +123,19 @@ func ParseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 		}
 
 		// Do some very adhoc mapping from certname to ports and register tlsa entries for them
-		tcp_ports := []int{443}
-		udp_ports := []int{}
+		tcpPorts := []int{443}
+		udpPorts := []int{}
 		if ports, ok := mappings[dns.SplitDomainName(name)[0]]; ok {
-			tcp_ports = ports.tcpports
-			udp_ports = ports.udpports
+			tcpPorts = ports.tcpports
+			udpPorts = ports.udpports
 		}
-		for _, port := range tcp_ports {
+		for _, port := range tcpPorts {
 			tlsa := fmt.Sprintf("_%d._tcp.%s", port, fqdn)
 			rr := &dns.TLSA{Hdr: dns.RR_Header{Name: tlsa, Class: dns.ClassINET, Ttl: uint32(*ttl)}}
 			_ = rr.Sign(3, 0, 1, cert)
 			(*zone2RR)[zone] = append((*zone2RR)[zone], rr)
 		}
-		for _, port := range udp_ports {
+		for _, port := range udpPorts {
 			tlsa := fmt.Sprintf("_%d._udp.%s", port, fqdn)
 			rr := &dns.TLSA{Hdr: dns.RR_Header{Name: tlsa, Class: dns.ClassINET, Ttl: uint32(*ttl)}}
 			_ = rr.Sign(3, 0, 1, cert)
@@ -184,7 +185,7 @@ func main() {
 
 	rrMap := make(map[string][]dns.RR, len(flag.Args()))
 	for _, d := range flag.Args() {
-		if err = ParseSingleDomain(d, &rrMap); err != nil {
+		if err = parseSingleDomain(d, &rrMap); err != nil {
 			fmt.Printf("Error processing %s: %v\n", d, err)
 			os.Exit(1)
 		}
