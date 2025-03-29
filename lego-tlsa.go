@@ -104,7 +104,7 @@ func parseSingleDomain(domain string, zone2RR *map[string][]dns.RR) error {
 	}
 	pemBlock, _ := pem.Decode(certBytes)
 	if pemBlock == nil {
-		return fmt.Errorf("Pem decode did not yield a valid block. Is the certificate in the right format?")
+		return fmt.Errorf("pem decode did not yield a valid block. Is the certificate in the right format?")
 	}
 	cert, err := x509.ParseCertificate(pemBlock.Bytes)
 	if err != nil {
