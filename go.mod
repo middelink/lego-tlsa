@@ -6,7 +6,7 @@ toolchain go1.24.0
 
 require (
 	github.com/go-acme/lego/v4 v4.22.2
-	github.com/miekg/dns v1.1.64
+	github.com/miekg/dns v1.1.65
 )
 
 require (
