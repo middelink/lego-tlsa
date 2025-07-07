@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.0
 
 require (
-	github.com/go-acme/lego/v4 v4.23.1
+	github.com/go-acme/lego/v4 v4.24.0
 	github.com/miekg/dns v1.1.66
 )
 
