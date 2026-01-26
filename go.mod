@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/go-acme/lego/v4 v4.31.0
-	github.com/miekg/dns v1.1.70
+	github.com/miekg/dns v1.1.72
 )
 
 require (
